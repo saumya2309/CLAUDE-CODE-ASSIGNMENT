@@ -1,0 +1,438 @@
+# Task A: Claude Architecture - The Full Stack
+
+## Overview
+
+Claude-based workflows operate as a sophisticated layered system where each layer has distinct responsibilities. This architecture enables complex AI workflows while maintaining safety, quality, and alignment with user intent.
+
+## The Five Layers
+
+### Layer 1: .claude.md - "How to Think" (Global Rules)
+
+**Purpose:** Defines the foundational reasoning habits, boundaries, and behavioral constraints that govern all Claude operations.
+
+**What it Contains:**
+- **Reasoning Principles:** How to approach problems, when to ask vs assume
+- **Tone & Style:** Communication preferences (concise, technical, friendly)
+- **Safety Guardrails:** What must never be done (delete production data, expose secrets)
+- **Quality Standards:** Output requirements (always include tests, document assumptions)
+- **Tool Usage Policies:** Which tools are allowed, required approvals
+- **Domain Knowledge:** Industry-specific terminology, compliance requirements
+
+**Example Rules:**
+```markdown
+## Reasoning
+- Always verify assumptions before proceeding
+- Ask for missing critical information rather than guessing
+- Prefer checklists for complex multi-step tasks
+
+## Safety
+- Never execute destructive operations without explicit confirmation
+- Redact all credentials, API keys, and PII from logs
+- Require human approval for production deployments
+
+## Output Format
+- Every report must include: Summary + Findings + Action Items
+- Code must include inline comments and type hints
+- All decisions must be documented with rationale
+```
+
+**Why it Matters:**
+The `.claude.md` file acts as the "constitution" of the system. It ensures consistent behavior across all tasks, prevents dangerous operations, and maintains quality standards even as requirements change.
+
+---
+
+### Layer 2: skill/ - Specialized Capabilities (Dynamic Resources)
+
+**Purpose:** Modular, reusable capabilities that encapsulate domain expertise and complex workflows.
+
+**What Skills Store:**
+- **Templates:** Structured formats for common outputs (reports, documentation)
+- **Procedures:** Step-by-step algorithms for complex tasks (security audits, data migrations)
+- **Tool Recipes:** Pre-configured tool call sequences for specific use cases
+- **Validation Rules:** Quality checks and acceptance criteria
+- **Error Handling:** Common failure modes and recovery strategies
+
+**Example Skill Structure:**
+```
+skill/security_audit/
+├── procedure.md          # Step-by-step audit process
+├── patterns.yaml         # Vulnerability detection patterns
+├── tools_config.json     # Required tools and configurations
+├── report_template.md    # Standard report format
+└── test_cases.json       # Validation test cases
+```
+
+**Characteristics:**
+- **Composable:** Skills can call other skills
+- **Reusable:** Same skill works across different projects
+- **Maintainable:** Update skill once, all users benefit
+- **Testable:** Skills have defined test cases
+
+**Example: skill/triage**
+```markdown
+# Skill: Issue Triage
+
+## Purpose
+Prioritize incoming issues and generate remediation plans
+
+## Inputs
+- issue_list: Array of issues with severity, component, description
+- sla_requirements: Service level agreement constraints
+
+## Procedure
+1. Parse and normalize issue data
+2. Classify by severity (Critical/High/Medium/Low)
+3. Calculate business impact
+4. Check for duplicates and related issues
+5. Assign priority score (severity × impact × urgency)
+6. Generate remediation plan with time estimates
+
+## Tools Used
+- analysis.classify()
+- database.query_similar()
+- planning.generate_timeline()
+
+## Output Template
+{
+  "critical_issues": [...],
+  "remediation_plan": [...],
+  "estimated_completion": "timestamp"
+}
+```
+
+---
+
+### Layer 3: Claude Engine - Who Executes (Reasoning + Coordination)
+
+**Purpose:** The core orchestration layer that interprets intent, plans execution, manages state, and ensures quality.
+
+**Core Responsibilities:**
+
+#### 3.1 Planning (Decomposer)
+- Breaks complex requests into manageable subtasks
+- Identifies dependencies between tasks
+- Creates execution sequences
+- Establishes checkpoints for validation
+
+#### 3.2 Routing (Selector)
+- Matches tasks to appropriate skills
+- Chooses optimal tools for each step
+- Considers safety constraints and permissions
+- Implements fallback strategies
+
+#### 3.3 Validation (Checker)
+- Verifies outputs against acceptance criteria
+- Cross-references results with inputs
+- Checks logical consistency
+- Validates format compliance
+
+#### 3.4 Clarification (Questioner)
+- Distinguishes critical unknowns from safe assumptions
+- Asks targeted questions for missing information
+- Documents assumptions made
+- Escalates when uncertainty is too high
+
+#### 3.5 State Management (Coordinator)
+- Tracks workflow progress
+- Maintains context across steps
+- Manages checkpoints and rollback points
+- Coordinates parallel execution streams
+
+**Data Flow Through Engine:**
+```
+User Intent → Parse → Plan → Route to Skill/Tool → Execute → Validate → 
+  ↓ (if invalid)
+  Retry/Adjust Plan → Execute → Validate → 
+  ↓ (if valid)
+  Update State → Next Step or Complete
+```
+
+---
+
+### Layer 4: Tools - Hands (External Capabilities)
+
+**Purpose:** Provide concrete capabilities to interact with systems, data, and environments.
+
+**Tool Categories:**
+
+#### File System Tools
+- `read_file()` - Read file contents
+- `write_file()` - Create or update files
+- `search_pattern()` - Find patterns across files
+- `list_directory()` - Enumerate files
+
+#### Shell Tools
+- `execute_command()` - Run shell commands
+- `run_script()` - Execute scripts with parameters
+- `check_status()` - Verify command success
+
+#### API Tools
+- `http_request()` - Make HTTP calls
+- `query_database()` - Execute SQL queries
+- `call_service()` - Invoke external services
+
+#### Analysis Tools
+- `parse_code()` - Extract code structure
+- `validate_schema()` - Check data formats
+- `calculate_metrics()` - Compute statistics
+
+**Tool Safety Considerations:**
+- Each tool has explicit permissions (read-only vs read-write)
+- Destructive operations require confirmation
+- Tool calls are logged for auditability
+- Rate limiting prevents resource exhaustion
+
+**Example Tool Call:**
+```python
+# Engine decides to use file_system.search_pattern
+result = tool_call(
+    name="file_system.search_pattern",
+    params={
+        "path": "/project/src",
+        "pattern": r"password\s*=\s*['\"].*['\"]",
+        "file_types": [".py", ".js"]
+    }
+)
+# Engine validates result before proceeding
+if result.matches_found > 0:
+    flag_security_issue(result)
+```
+
+**What Tools Change:**
+- **Capabilities:** Claude can now interact with real systems, not just reason abstractly
+- **Risks:** Improper tool use can cause real damage (delete files, expose data)
+- **Complexity:** Tool failures must be handled gracefully
+- **Power:** Complex workflows become possible (build, test, deploy)
+
+---
+
+### Layer 5: User - Director (Provides Intent)
+
+**Purpose:** The human element that sets goals, constraints, priorities, and provides domain context.
+
+**User Responsibilities:**
+
+#### 5.1 Intent Definition
+- Clearly state desired outcomes
+- Provide acceptance criteria
+- Define success metrics
+- Set boundaries and constraints
+
+#### 5.2 Context Provision
+- Share relevant background information
+- Provide domain-specific knowledge
+- Explain organizational constraints
+- Clarify priorities when conflicts arise
+
+#### 5.3 Feedback Loop
+- Review intermediate results
+- Answer clarifying questions
+- Approve or reject proposals
+- Adjust requirements based on learnings
+
+#### 5.4 Constraint Setting
+- Time limits and deadlines
+- Budget and resource constraints
+- Compliance and regulatory requirements
+- Risk tolerance levels
+
+**How User Intent Steers Execution:**
+
+The system continuously aligns to user intent through:
+- **Initial Prompt:** Shapes the entire workflow plan
+- **Clarifying Questions:** Engine asks when ambiguity is detected
+- **Checkpoints:** User reviews and approves before proceeding
+- **Feedback:** User corrections update the plan
+- **Termination:** User can stop execution at any point
+
+**Example User Journey:**
+```
+User: "Audit our authentication system for vulnerabilities"
+  ↓
+Engine: "What compliance framework should I check against?"
+  ↓
+User: "SOC2 and OWASP Top 10"
+  ↓
+Engine: Executes audit with those constraints
+  ↓
+Engine: "Found 12 issues. Should I prioritize quick wins or critical risks?"
+  ↓
+User: "Critical risks first, then we'll tackle quick wins"
+  ↓
+Engine: Adjusts remediation plan priority
+```
+
+---
+
+## Data & Control Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    USER (Layer 5)                       │
+│  • Provides: Intent, Context, Constraints, Feedback     │
+│  • Controls: Approval, Priorities, Termination          │
+└────────────────────┬────────────────────────────────────┘
+                     │ Intent & Requirements
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│              .claude.md (Layer 1)                       │
+│  • Loads: Global rules, policies, guardrails            │
+│  • Enforces: Safety, quality, compliance                │
+└────────────────────┬────────────────────────────────────┘
+                     │ Rules Applied
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│            CLAUDE ENGINE (Layer 3)                      │
+│                                                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐             │
+│  │ Planner  │→ │  Router  │→ │ Executor │             │
+│  └──────────┘  └──────────┘  └──────────┘             │
+│        ↓              ↓              ↓                  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐             │
+│  │Validator │  │ Clarifier│  │State Mgr │             │
+│  └──────────┘  └──────────┘  └──────────┘             │
+│                                                          │
+└──────┬─────────────────────────────────┬────────────────┘
+       │                                 │
+       │ Select Skill                    │ Call Tool
+       ▼                                 ▼
+┌─────────────────┐           ┌─────────────────────┐
+│  skill/ (L2)    │           │   TOOLS (Layer 4)   │
+│                 │           │                     │
+│ • security_audit│           │ • file_system       │
+│ • doc_generator │           │ • shell             │
+│ • data_pipeline │           │ • api_client        │
+│                 │           │ • analysis          │
+└─────────────────┘           └─────────────────────┘
+       │                                 │
+       │ Skill Output                    │ Tool Results
+       └────────────┬────────────────────┘
+                    ▼
+         ┌─────────────────────┐
+         │  Aggregated Results │
+         └──────────┬──────────┘
+                    │
+                    ▼ Validation & Quality Check
+         ┌─────────────────────┐
+         │   Final Deliverable │
+         └──────────┬──────────┘
+                    │
+                    ▼
+         ┌─────────────────────┐
+         │    USER (Receives)  │
+         └─────────────────────┘
+```
+
+## Layer Interaction Examples
+
+### Example 1: Security Audit Request
+
+**User Layer:**
+```
+"Audit our payment processing code for PCI-DSS compliance"
+```
+
+**.claude.md Layer:**
+```
+Rules Applied:
+✓ Never expose actual credit card numbers in reports
+✓ Require evidence for all findings
+✓ Use severity ratings from CVSS
+```
+
+**Engine Layer:**
+```
+Plan:
+1. Load skill/security_audit
+2. Configure for PCI-DSS framework
+3. Scan payment processing modules
+4. Validate findings
+5. Generate compliant report
+
+Route: skill/security_audit with PCI-DSS config
+```
+
+**Skill Layer:**
+```
+skill/security_audit executes:
+- Load PCI-DSS requirements checklist
+- Scan for card data handling
+- Check encryption methods
+- Verify audit logging
+```
+
+**Tool Layer:**
+```
+Tools Used:
+- file_system.read() → Read payment.py
+- search_pattern() → Find card number patterns
+- shell.execute() → Run Bandit security scanner
+```
+
+**Return Flow:**
+```
+Tools → Skill: Scan results
+Skill → Engine: Formatted findings
+Engine → Validates against .claude.md rules
+Engine → User: PCI-DSS compliance report
+```
+
+### Example 2: Documentation Generation
+
+**User:** "Generate API documentation for our REST service"
+
+**.claude.md:** Enforce "all examples must be tested" rule
+
+**Engine:** Routes to skill/doc_generator
+
+**Skill:** Executes documentation generation procedure
+
+**Tools:** 
+- `file_system.read()` - Read route definitions
+- `parse_code()` - Extract endpoint details
+- `http_request()` - Test example API calls
+
+**Result:** Complete API reference with validated examples
+
+---
+
+## Key Principles
+
+### 1. Separation of Concerns
+Each layer has a distinct responsibility, making the system:
+- **Modular:** Change one layer without affecting others
+- **Testable:** Validate each layer independently
+- **Maintainable:** Clear boundaries for debugging
+
+### 2. Progressive Refinement
+Information flows down (intent → execution) and results flow up (outputs → validation):
+- User intent becomes increasingly concrete at each layer
+- Results become increasingly validated as they return
+
+### 3. Safety Through Layers
+Multiple checkpoints prevent harmful actions:
+- `.claude.md` defines what's never allowed
+- Skills encode safe procedures
+- Engine validates before and after
+- Tools have explicit permissions
+- User must approve critical operations
+
+### 4. Adaptability
+The architecture supports changing requirements:
+- Update `.claude.md` for new policies
+- Add skills for new capabilities
+- Configure engine for different workflows
+- Integrate new tools as needed
+
+---
+
+## Conclusion
+
+This five-layer architecture enables Claude to:
+- Reason about complex tasks (Engine)
+- Apply specialized expertise (Skills)
+- Interact with real systems (Tools)
+- Maintain safety and quality (.claude.md)
+- Align with human intent (User)
+
+The architecture is both powerful and safe because each layer constrains and validates the layers below it, creating a system where sophisticated automation operates within carefully defined boundaries.
